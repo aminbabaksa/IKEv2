@@ -1,7 +1,8 @@
-bash -c 'cat >/root/install_ikev2_eap.sh << "EOF"
+bash -c 'cat >/root/install_ikev2_aminbaba.sh << "EOF"
 #!/usr/bin/env bash
 set -euo pipefail
 
+# -------- Prompts --------
 read -rp "VPN username: " VPN_USER
 read -rsp "VPN password: " VPN_PASS; echo
 read -rp "Optional domain (leave empty to use server IP): " VPN_DOMAIN
@@ -10,7 +11,8 @@ PUB_IP="$(curl -fsS ifconfig.me || dig +short myip.opendns.com @resolver1.opendn
 WAN_IF="$(ip route get 1.1.1.1 | awk '\''{for(i=1;i<=NF;i++) if($i=="dev"){print $(i+1); exit}}'\'')"
 [[ -n "${WAN_IF}" ]] || { echo "[-] Could not detect WAN interface"; exit 1; }
 
-ID_VALUE="${VPN_DOMAIN:-$PUB_IP}"
+# Force the IPSec identifier to "aminbaba"
+ID_VALUE="aminbaba"
 POOL_SUBNET="10.10.10.0/24"
 DNS1="1.1.1.1"
 DNS2="8.8.8.8"
@@ -20,7 +22,7 @@ export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
 apt-get install -y strongswan strongswan-pki iptables-persistent openssl
 
-echo "[+] Enabling IPv4 forwarding..."
+echo "[+] Enable IPv4 forwarding..."
 sysctl -w net.ipv4.ip_forward=1 >/dev/null
 mkdir -p /etc/sysctl.d
 printf "net.ipv4.ip_forward=1\n" >/etc/sysctl.d/99-ikev2-forward.conf
@@ -32,11 +34,12 @@ install -d -m 755 /etc/ipsec.d/certs
 openssl ecparam -genkey -name prime256v1 -out /etc/ipsec.d/private/serverkey.pem
 chmod 600 /etc/ipsec.d/private/serverkey.pem
 
+# SAN must include server IP or domain for Android
 SAN_ARG="subjectAltName="
-if [[ "${ID_VALUE}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-  SAN_ARG+="IP:${ID_VALUE}"
+if [[ -n "${VPN_DOMAIN}" ]]; then
+  SAN_ARG+="DNS:${VPN_DOMAIN}"
 else
-  SAN_ARG+="DNS:${ID_VALUE}"
+  SAN_ARG+="IP:${PUB_IP}"
 fi
 
 openssl req -new -key /etc/ipsec.d/private/serverkey.pem -subj "/CN=${ID_VALUE}" -out /tmp/server.csr
@@ -97,14 +100,16 @@ systemctl restart strongswan-starter
 
 echo
 echo "[✓] IKEv2 EAP server ready."
-echo "Server address: ${VPN_DOMAIN:-$PUB_IP}"
-echo "Android form:"
+echo "Server public IP: ${PUB_IP}"
+echo
+echo "Android config (like your screenshot):"
+echo "  Name: admin (or anything)"
 echo "  Type: IKEv2/IPSec MSCHAPv2"
 echo "  Server address: ${VPN_DOMAIN:-$PUB_IP}"
-echo "  IPSec identifier: Not used"
+echo "  IPSec identifier: aminbaba"
 echo "  IPSec CA certificate: Don'\''t verify server"
 echo "  Username: ${VPN_USER}"
 echo "  Password: (the one you set)"
 EOF
-chmod +x /root/install_ikev2_eap.sh
-bash /root/install_ikev2_eap.sh'
+chmod +x /root/install_ikev2_aminbaba.sh
+bash /root/install_ikev2_aminbaba.sh'
