@@ -1,16 +1,16 @@
-bash -c 'cat >/root/install_ikev2_psk.sh << "EOF"
 #!/usr/bin/env bash
 set -euo pipefail
 
 read -rp "VPN pre-shared key (PSK): " VPN_PSK
 read -rp "Optional domain (leave empty to use server IP): " VPN_DOMAIN
 
-PUB_IP="$(curl -fsS ifconfig.me || dig +short myip.opendns.com @resolver1.opendns.com || hostname -I | awk "{print \$1}")"
-WAN_IF="$(ip route get 1.1.1.1 | awk '\''{for(i=1;i<=NF;i++) if($i=="dev"){print $(i+1); exit}}'\'')"
+PUB_IP="$(curl -fsS ifconfig.me || dig +short myip.opendns.com @resolver1.opendns.com || hostname -I | awk '{print $1}')"
+WAN_IF="$(ip route get 1.1.1.1 | awk '{for(i=1;i<=NF;i++) if($i=="dev"){print $(i+1); exit}}')"
 [[ -n "${WAN_IF}" ]] || { echo "[-] Could not detect WAN interface"; exit 1; }
 
-ID_VALUE="${VPN_DOMAIN:-$PUB_IP}"
-POOL_SUBNET="10.20.20.0/24"
+# Force identifier
+ID_VALUE="aminbaba"
+POOL_SUBNET="10.30.30.0/24"
 DNS1="1.1.1.1"
 DNS2="8.8.8.8"
 
@@ -42,7 +42,7 @@ conn ikev2-psk
   dpddelay=30s
 
   left=%any
-  leftid=${ID_VALUE}
+  leftid=@${ID_VALUE}
   leftsubnet=0.0.0.0/0
   leftauth=psk
 
@@ -74,14 +74,13 @@ systemctl restart strongswan-starter
 echo
 echo "[✓] IKEv2 PSK server ready."
 echo "Server address: ${VPN_DOMAIN:-$PUB_IP}"
+echo "Identifier (leftid): aminbaba"
 echo "Pre-Shared Key: ${VPN_PSK}"
 echo
-echo "Android config (like your screenshot):"
-echo "  Name: admin (or anything)"
+echo "Android config:"
+echo "  Name: anything"
 echo "  Type: IKEv2/IPSec PSK"
 echo "  Server address: ${VPN_DOMAIN:-$PUB_IP}"
-echo "  IPSec identifier: Not used"
+echo "  IPSec identifier: aminbaba"
 echo "  IPSec pre-shared key: ${VPN_PSK}"
 EOF
-chmod +x /root/install_ikev2_psk.sh
-bash /root/install_ikev2_psk.sh'
